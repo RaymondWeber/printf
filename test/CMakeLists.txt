@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.9)
 enable_language(CXX)
 
 set(test_targets autotest)
-if (NOT ALIAS_STANDARD_FUNCTION_NAMES)
+if (NOT ALIAS_STANDARD_FUNCTION_NAMES STREQUAL SOFT)
 	list(APPEND test_targets test_suite)
 endif()
 
@@ -71,6 +71,9 @@ foreach(tgt ${test_targets})
 			-fverbose-asm
 			-Wunused-parameter
 		)
+		target_compile_options(${tgt} PRIVATE
+		  "$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>"
+		)			
 		if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 			target_compile_options(${tgt} PRIVATE -ffat-lto-objects)
 		endif()
@@ -78,7 +81,7 @@ foreach(tgt ${test_targets})
 
 endforeach()
 
-if (NOT ALIAS_STANDARD_FUNCTION_NAMES)
+if (TARGET test_suite)
 	# These two lines are necessary, since the test suite does not actually use the
 	# compiled library - it includes the library's source .c file; and that means we
 	# need to include the generated config.h file.

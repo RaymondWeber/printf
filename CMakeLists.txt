@@ -20,7 +20,17 @@ option(SUPPORT_EXPONENTIAL_SPECIFIERS         "Support exponential floating poin
 option(SUPPORT_MSVC_STYLE_INTEGER_SPECIFIERS  "Support the I + bit size integer specifiers (%I8, %I16, %I32, %I64) as in Microsoft Visual C++" ON)
 option(SUPPORT_WRITEBACK_SPECIFIER            "Support the length write-back specifier (%n)" ON)
 option(SUPPORT_LONG_LONG                      "Support long long integral types (allows for the ll length modifier and affects %p)" ON)
-option(ALIAS_STANDARD_FUNCTION_NAMES          "Alias the standard library function names (printf, sprintf etc.) to the library's functions" ON)
+option(CHECK_FOR_NUL_IN_FORMAT_SPECIFIER      "Be defensive in the undefined-behavior case of a format specifier not ending before the string ends" ON)
+
+set(ALIASING_MODES NONE HARD SOFT)
+set(ALIAS_STANDARD_FUNCTION_NAMES NONE CACHE STRING "Alias the standard library function names (printf, sprintf etc.) to the library's functions - concretely, via a macro, or not at all")
+set_property(CACHE ALIAS_STANDARD_FUNCTION_NAMES PROPERTY STRINGS ${ALIASING_MODES})
+
+#option(ALIAS_STANDARD_FUNCTION_NAMES          "Alias the standard library function names (printf, sprintf etc.) to the library's functions" ON)
+
+if (NOT ${ALIAS_STANDARD_FUNCTION_NAMES} STREQUAL NONE)
+	set("ALIAS_STANDARD_FUNCTION_NAMES_${ALIAS_STANDARD_FUNCTION_NAMES}" 1)
+endif()
 
 foreach(opt
 	SUPPORT_DECIMAL_SPECIFIERS
@@ -28,7 +38,10 @@ foreach(opt
 	SUPPORT_MSVC_STYLE_INTEGER_SPECIFIERS
 	SUPPORT_WRITEBACK_SPECIFIER
 	SUPPORT_LONG_LONG
-	ALIAS_STANDARD_FUNCTION_NAMES)
+	ALIAS_STANDARD_FUNCTION_NAMES_SOFT
+	ALIAS_STANDARD_FUNCTION_NAMES_HARD
+	CHECK_FOR_NUL_IN_FORMAT_SPECIFIER        
+        )
 	if (${${opt}})
 		set("PRINTF_${opt}" 1)
 	else()
@@ -66,6 +79,10 @@ if (BUILD_STATIC_LIBRARY)
 else()
 	add_library(printf SHARED)
 endif()
+
+add_library("printf::printf" ALIAS printf)
+
+
 set(GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/include")
 configure_file("printf_config.h.in" "${GENERATED_INCLUDE_DIR}/printf_config.h" @ONLY)
 target_sources(printf PRIVATE src/printf/printf.c "${GENERATED_INCLUDE_DIR}/printf_config.h" src/printf/printf.h)
@@ -86,8 +103,8 @@ target_include_directories(
 )
 
 set_target_properties(printf PROPERTIES
-         LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
-         ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+	LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib
+	ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 
 if (CMAKE_C_COMPILER_ID STREQUAL "MSVC")
 	target_compile_options(printf PRIVATE /W4)
@@ -136,6 +153,9 @@ endif()
 
 include(GNUInstallDirs)
 
+# Note: No need for a config.cmake file for setting dependencies - as there
+# are no dependencies; this library is self-contained
+
 install(
 	TARGETS printf
 	EXPORT printf_export
@@ -150,11 +170,17 @@ install(
 	DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/printf"
 )
 
+export(
+	EXPORT printf_export
+	NAMESPACE "printf::"
+	FILE "${PROJECT_BINARY_DIR}/printf-targets.cmake"
+)
+
 install(
 	EXPORT printf_export
+	FILE "printf-targets.cmake"
 	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/printf"
 	NAMESPACE "printf::"
-	FILE "printf-config.cmake"
 )
 
 include(CMakePackageConfigHelpers)
@@ -169,6 +195,3 @@ install(
 	FILES "${CMAKE_CURRENT_BINARY_DIR}/printf-config-version.cmake"
 	DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/printf"
 )
-
-
-

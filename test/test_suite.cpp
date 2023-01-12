@@ -29,8 +29,20 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #define PRINTF_VISIBILITY static
+#if PRINTF_INCLUDE_CONFIG_H
 #include <printf_config.h>
+#endif
 #include <printf/printf.c>
+
+#if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_HARD
+// Disable aliasing so as not to interfere with the standard library headers
+# undef printf
+# undef sprintf_
+# undef vsprintf_
+# undef snprintf_
+# undef vsnprintf_
+# undef vprintf_
+#endif
 
 // use the 'catch' test framework
 #define CATCH_CONFIG_MAIN
@@ -44,14 +56,25 @@
 #include <iostream>
 #include <iomanip>
 
-#if defined(_WIN32)
+#if defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)) || defined(__MINGW32__)
+#include <sys/types.h>
+#elif defined(_WIN32)
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
-#elif defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__))
-#include <sys/types.h>
 #else
 // Let's just cross our fingers and hope `ssize_t` is defined.
 #endif
+
+#if PRINTF_ALIAS_STANDARD_FUNCTION_NAMES_SOFT
+// Re-enable aliasing
+# define printf     printf_
+# define sprintf    sprintf_
+# define vsprintf   vsprintf_
+# define snprintf   snprintf_
+# define vsnprintf  vsnprintf_
+# define vprintf    vprintf_
+#endif
+
 
 #define CAPTURE_AND_PRINT(printer_, ...)                  \
 do {                                                      \
@@ -61,6 +84,16 @@ do {                                                      \
   CAPTURE( __VA_ARGS__);                                  \
   printer_(__VA_ARGS__);                                  \
 } while(0)
+
+#define CAPTURE_AND_PRINT_WITH_RETVAL(retval, printer_, ...) \
+do {                                                      \
+  INFO( #printer_  <<                                     \
+     " arguments (ignore the equations; interpret \"expr" \
+     "\" := expr\" as just \"expr\"): ");                 \
+  CAPTURE( __VA_ARGS__);                                  \
+  retval = printer_(__VA_ARGS__);                         \
+} while(0)
+
 
 #define PRINTING_CHECK_WITH_BUF_SIZE(expected_, dummy, printer_, buffer_, buffer_size, ...) \
 do {                                                             \
